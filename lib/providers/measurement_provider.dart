@@ -11,10 +11,10 @@ class MeasurementNotifier extends StateNotifier<List<Measurement>> {
   final int customerId;
 
   MeasurementNotifier(this.customerId) : super([]) {
-    loadMeasurements();
+    _load();
   }
 
-  Future<void> loadMeasurements() async {
+  Future<void> _load() async {
     final measurements =
         await DatabaseHelper.instance.getMeasurements(customerId);
     state = measurements;
@@ -31,7 +31,6 @@ class MeasurementNotifier extends StateNotifier<List<Measurement>> {
       shoulder: measurement.shoulder,
       armLength: measurement.armLength,
       legLength: measurement.legLength,
-      thigh: measurement.thigh,
       notes: measurement.notes,
       createdAt: measurement.createdAt,
     );

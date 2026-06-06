@@ -10,7 +10,11 @@ import 'screens/calendar/calendar_screen.dart';
 import 'models/customer.dart';
 import 'models/order.dart';
 
-void main() {
+import 'package:intl/date_symbol_data_local.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('tr', null);
   runApp(const ProviderScope(child: TerziApp()));
 }
 
@@ -37,13 +41,6 @@ final _router = GoRouter(
       ],
     ),
     GoRoute(
-      path: '/customers/:id',
-      builder: (context, state) {
-        final customer = state.extra as Customer;
-        return CustomerDetailScreen(customer: customer);
-      },
-    ),
-    GoRoute(
       path: '/customers/new',
       builder: (context, state) => const CustomerFormScreen(),
     ),
@@ -52,6 +49,13 @@ final _router = GoRouter(
       builder: (context, state) {
         final customer = state.extra as Customer;
         return CustomerFormScreen(customer: customer);
+      },
+    ),
+    GoRoute(
+      path: '/customers/:id',
+      builder: (context, state) {
+        final customer = state.extra as Customer;
+        return CustomerDetailScreen(customer: customer);
       },
     ),
     GoRoute(
@@ -123,9 +127,15 @@ class MainScaffold extends StatelessWidget {
         selectedIndex: _selectedIndex(context),
         onDestinationSelected: (index) {
           switch (index) {
-            case 0: context.go('/customers'); break;
-            case 1: context.go('/orders'); break;
-            case 2: context.go('/calendar'); break;
+            case 0:
+              context.go('/customers');
+              break;
+            case 1:
+              context.go('/orders');
+              break;
+            case 2:
+              context.go('/calendar');
+              break;
           }
         },
         destinations: const [

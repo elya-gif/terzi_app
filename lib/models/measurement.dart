@@ -7,7 +7,6 @@ class Measurement {
   final double? shoulder;
   final double? armLength;
   final double? legLength;
-  final double? thigh;
   final String? notes;
   final DateTime createdAt;
 
@@ -20,7 +19,6 @@ class Measurement {
     this.shoulder,
     this.armLength,
     this.legLength,
-    this.thigh,
     this.notes,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -35,7 +33,6 @@ class Measurement {
       'shoulder': shoulder,
       'arm_length': armLength,
       'leg_length': legLength,
-      'thigh': thigh,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
     };
@@ -51,7 +48,6 @@ class Measurement {
       shoulder: map['shoulder']?.toDouble(),
       armLength: map['arm_length']?.toDouble(),
       legLength: map['leg_length']?.toDouble(),
-      thigh: map['thigh']?.toDouble(),
       notes: map['notes'],
       createdAt: DateTime.parse(map['created_at']),
     );

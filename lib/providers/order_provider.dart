@@ -9,10 +9,10 @@ final orderListProvider =
 
 class OrderNotifier extends StateNotifier<List<Order>> {
   OrderNotifier() : super([]) {
-    loadOrders();
+    _load();
   }
 
-  Future<void> loadOrders() async {
+  Future<void> _load() async {
     final orders = await DatabaseHelper.instance.getAllOrders();
     state = orders;
   }
@@ -20,8 +20,7 @@ class OrderNotifier extends StateNotifier<List<Order>> {
   Future<void> addOrder(Order order) async {
     final id = await DatabaseHelper.instance.insertOrder(order);
     final newOrder = order.copyWith(id: id);
-    state = [...state, newOrder];
-    state = [...state]
+    state = [...state, newOrder]
       ..sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
   }
 
@@ -39,9 +38,5 @@ class OrderNotifier extends StateNotifier<List<Order>> {
   Future<void> deleteOrder(int id) async {
     await DatabaseHelper.instance.deleteOrder(id);
     state = state.where((o) => o.id != id).toList();
-  }
-
-  List<Order> getOrdersByCustomer(int customerId) {
-    return state.where((o) => o.customerId == customerId).toList();
   }
 }

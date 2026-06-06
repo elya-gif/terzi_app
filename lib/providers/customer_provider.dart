@@ -1,18 +1,19 @@
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../db/database_helper.dart';
 import '../models/customer.dart';
+import 'order_provider.dart';
 
 final customerListProvider =
-    StateNotifierProvider<CustomerNotifier, List<Customer>>((ref) {
-  return CustomerNotifier();
-});
+    NotifierProvider<CustomerNotifier, List<Customer>>(CustomerNotifier.new);
 
-class CustomerNotifier extends StateNotifier<List<Customer>> {
-  CustomerNotifier() : super([]) {
-    loadCustomers();
+class CustomerNotifier extends Notifier<List<Customer>> {
+  @override
+  List<Customer> build() {
+    _load();
+    return [];
   }
 
-  Future<void> loadCustomers() async {
+  Future<void> _load() async {
     final customers = await DatabaseHelper.instance.getAllCustomers();
     state = customers;
   }
@@ -20,8 +21,7 @@ class CustomerNotifier extends StateNotifier<List<Customer>> {
   Future<void> addCustomer(Customer customer) async {
     final id = await DatabaseHelper.instance.insertCustomer(customer);
     final newCustomer = customer.copyWith(id: id);
-    state = [...state, newCustomer];
-    state = [...state]..sort((a, b) => a.name.compareTo(b.name));
+    state = [...state, newCustomer]..sort((a, b) => a.name.compareTo(b.name));
   }
 
   Future<void> updateCustomer(Customer customer) async {
@@ -34,3 +34,8 @@ class CustomerNotifier extends StateNotifier<List<Customer>> {
     state = state.where((c) => c.id != id).toList();
   }
 }
+
+final orderCountProvider = Provider.family<int, int>((ref, customerId) {
+  final orders = ref.watch(orderListProvider);
+  return orders.where((o) => o.customerId == customerId).length;
+});

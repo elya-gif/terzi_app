@@ -1,12 +1,10 @@
-enum OrderStatus { received, inProgress, ready, delivered }
+enum OrderStatus { received, delivered }
 
 extension OrderStatusExtension on OrderStatus {
   String get label {
     switch (this) {
-      case OrderStatus.received:    return 'Alındı';
-      case OrderStatus.inProgress:  return 'Devam ediyor';
-      case OrderStatus.ready:       return 'Hazır';
-      case OrderStatus.delivered:   return 'Teslim edildi';
+      case OrderStatus.received:  return 'Alındı';
+      case OrderStatus.delivered: return 'Teslim edildi';
     }
   }
 

@@ -35,7 +35,7 @@ class OrderListScreen extends ConsumerWidget {
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) =>
-                        _OrderCard(order: filtered[index]),
+                        _SwipeableOrderCard(order: filtered[index]),
                   ),
           ),
         ],
@@ -115,13 +115,62 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _OrderCard extends ConsumerWidget {
+class _SwipeableOrderCard extends ConsumerWidget {
   final Order order;
-  const _OrderCard({required this.order});
+  const _SwipeableOrderCard({required this.order});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDelivered = order.status == OrderStatus.delivered;
+
+    if (isDelivered) {
+      return _OrderCardContent(order: order);
+    }
+
+    return Dismissible(
+      key: ValueKey('order_${order.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        await ref
+            .read(orderListProvider.notifier)
+            .updateStatus(order, OrderStatus.delivered);
+        return false; // liste item'ı kaldırma, sadece güncelle
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: Colors.green,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.white, size: 28),
+            SizedBox(height: 4),
+            Text('Teslim Edildi',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+      child: _OrderCardContent(order: order),
+    );
+  }
+}
+
+class _OrderCardContent extends ConsumerWidget {
+  final Order order;
+  const _OrderCardContent({required this.order});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dateFormat = DateFormat('d MMM yyyy', 'tr');
+    final isDelivered = order.status == OrderStatus.delivered;
+    final daysLeft = order.deliveryDate.difference(DateTime.now()).inDays;
+    final isUrgent = !isDelivered && daysLeft <= 2;
 
     return Card(
       child: InkWell(
@@ -137,8 +186,12 @@ class _OrderCard extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       order.productName,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w500, fontSize: 15),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                          color: isDelivered
+                              ? Theme.of(context).colorScheme.outline
+                              : null),
                     ),
                   ),
                   _StatusBadge(status: order.status),
@@ -158,14 +211,34 @@ class _OrderCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.calendar_today_outlined, size: 14),
+                  Icon(Icons.calendar_today_outlined,
+                      size: 14,
+                      color: isUrgent ? Colors.red : null),
                   const SizedBox(width: 4),
                   Text(
                     dateFormat.format(order.deliveryDate),
                     style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.outline),
+                        color: isUrgent
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.outline,
+                        fontWeight:
+                            isUrgent ? FontWeight.w600 : FontWeight.normal),
                   ),
+                  if (isUrgent) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      daysLeft == 0
+                          ? '(Bugün!)'
+                          : daysLeft < 0
+                              ? '(${-daysLeft} gün geçti!)'
+                              : '($daysLeft gün kaldı)',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
                   const Spacer(),
                   Text(
                     '₺${order.price.toStringAsFixed(0)}',
@@ -174,73 +247,29 @@ class _OrderCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              _StatusStepper(order: order),
+              if (!isDelivered)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(Icons.swipe_left_outlined,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.outline),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Teslim için sola kaydır',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.outline),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StatusStepper extends ConsumerWidget {
-  final Order order;
-  const _StatusStepper({required this.order});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final statuses = OrderStatus.values;
-    final currentIndex = statuses.indexOf(order.status);
-
-    return Row(
-      children: statuses.asMap().entries.map((entry) {
-        final index = entry.key;
-        final status = entry.value;
-        final isCompleted = index <= currentIndex;
-        final isLast = index == statuses.length - 1;
-
-        return Expanded(
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () => ref
-                    .read(orderListProvider.notifier)
-                    .updateStatus(order, status),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isCompleted
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                    border: Border.all(
-                      color: isCompleted
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outline,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: isCompleted
-                      ? const Icon(Icons.check, size: 12, color: Colors.white)
-                      : null,
-                ),
-              ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    height: 1.5,
-                    color: isCompleted && index < currentIndex
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                  ),
-                ),
-            ],
-          ),
-        );
-      }).toList(),
     );
   }
 }
@@ -251,7 +280,9 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _color(context);
+    final color = status == OrderStatus.delivered
+        ? Colors.grey
+        : Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -265,15 +296,6 @@ class _StatusBadge extends StatelessWidget {
       ),
     );
   }
-
-  Color _color(BuildContext context) {
-    switch (status) {
-      case OrderStatus.inProgress: return Colors.orange;
-      case OrderStatus.ready:      return Colors.green;
-      case OrderStatus.delivered:  return Colors.grey;
-      default: return Theme.of(context).colorScheme.primary;
-    }
-  }
 }
 
 class _EmptyState extends StatelessWidget {
@@ -285,8 +307,8 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.list_alt_outlined, size: 64,
-              color: Theme.of(context).colorScheme.outline),
+          Icon(Icons.list_alt_outlined,
+              size: 64, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 16),
           Text('Henüz sipariş yok',
               style: Theme.of(context).textTheme.titleMedium),

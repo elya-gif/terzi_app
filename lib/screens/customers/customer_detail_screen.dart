@@ -175,12 +175,22 @@ class _MeasurementCard extends StatelessWidget {
                   _MeasureChip(label: 'Bel', value: measurement.waist!),
                 if (measurement.hips != null)
                   _MeasureChip(label: 'Kalça', value: measurement.hips!),
-                if (measurement.shoulder != null)
-                  _MeasureChip(label: 'Omuz', value: measurement.shoulder!),
+                if (measurement.upperHeight != null)
+                  _MeasureChip(label: 'Üst boy', value: measurement.upperHeight!),
+                if (measurement.lowerHeight != null)
+                  _MeasureChip(label: 'Alt boy', value: measurement.lowerHeight!),
                 if (measurement.armLength != null)
-                  _MeasureChip(label: 'Kol', value: measurement.armLength!),
-                if (measurement.legLength != null)
-                  _MeasureChip(label: 'Bacak', value: measurement.legLength!),
+                  _MeasureChip(label: 'Kol boy', value: measurement.armLength!),
+                if (measurement.skirtLength != null)
+                  _MeasureChip(label: 'Etek boy', value: measurement.skirtLength!),
+                if (measurement.pantLength != null)
+                  _MeasureChip(label: 'Pant boy', value: measurement.pantLength!),
+                if (measurement.vestLength != null)
+                  _MeasureChip(label: 'Yelek boy', value: measurement.vestLength!),
+                if (measurement.jacketLength != null)
+                  _MeasureChip(label: 'Çeket boy', value: measurement.jacketLength!),
+                if (measurement.tunicLength != null)
+                  _MeasureChip(label: 'Tunik boy', value: measurement.tunicLength!),
               ],
             ),
             if (measurement.notes != null && measurement.notes!.isNotEmpty) ...[
@@ -323,10 +333,8 @@ class _StatusBadge extends StatelessWidget {
 
   Color _color(BuildContext context) {
     switch (status) {
-      case OrderStatus.inProgress: return Colors.orange;
-      case OrderStatus.ready:      return Colors.green;
-      case OrderStatus.delivered:  return Colors.grey;
-      default:                     return Theme.of(context).colorScheme.primary;
+      case OrderStatus.delivered: return Colors.grey;
+      default:                    return Theme.of(context).colorScheme.primary;
     }
   }
 }
@@ -345,9 +353,14 @@ class _MeasurementFormSheetState extends ConsumerState<MeasurementFormSheet> {
     'chest': TextEditingController(),
     'waist': TextEditingController(),
     'hips': TextEditingController(),
-    'shoulder': TextEditingController(),
+    'upperHeight': TextEditingController(),
+    'lowerHeight': TextEditingController(),
     'armLength': TextEditingController(),
-    'legLength': TextEditingController(),
+    'skirtLength': TextEditingController(),
+    'pantLength': TextEditingController(),
+    'vestLength': TextEditingController(),
+    'jacketLength': TextEditingController(),
+    'tunicLength': TextEditingController(),
   };
   final _notesController = TextEditingController();
   bool _isLoading = false;
@@ -373,9 +386,14 @@ class _MeasurementFormSheetState extends ConsumerState<MeasurementFormSheet> {
       chest: _parse('chest'),
       waist: _parse('waist'),
       hips: _parse('hips'),
-      shoulder: _parse('shoulder'),
+      upperHeight: _parse('upperHeight'),
+      lowerHeight: _parse('lowerHeight'),
       armLength: _parse('armLength'),
-      legLength: _parse('legLength'),
+      skirtLength: _parse('skirtLength'),
+      pantLength: _parse('pantLength'),
+      vestLength: _parse('vestLength'),
+      jacketLength: _parse('jacketLength'),
+      tunicLength: _parse('tunicLength'),
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
@@ -413,9 +431,14 @@ class _MeasurementFormSheetState extends ConsumerState<MeasurementFormSheet> {
               _MeasureField(controller: _controllers['chest']!, label: 'Göğüs'),
               _MeasureField(controller: _controllers['waist']!, label: 'Bel'),
               _MeasureField(controller: _controllers['hips']!, label: 'Kalça'),
-              _MeasureField(controller: _controllers['shoulder']!, label: 'Omuz'),
-              _MeasureField(controller: _controllers['armLength']!, label: 'Kol boyu'),
-              _MeasureField(controller: _controllers['legLength']!, label: 'Bacak boyu'),
+              _MeasureField(controller: _controllers['upperHeight']!, label: 'Üst boy'),
+              _MeasureField(controller: _controllers['lowerHeight']!, label: 'Alt boy'),
+              _MeasureField(controller: _controllers['armLength']!, label: 'Kol boy'),
+              _MeasureField(controller: _controllers['skirtLength']!, label: 'Etek boy'),
+              _MeasureField(controller: _controllers['pantLength']!, label: 'Pant boy'),
+              _MeasureField(controller: _controllers['vestLength']!, label: 'Yelek boy'),
+              _MeasureField(controller: _controllers['jacketLength']!, label: 'Çeket boy'),
+              _MeasureField(controller: _controllers['tunicLength']!, label: 'Tunik boy'),
             ],
           ),
           const SizedBox(height: 10),

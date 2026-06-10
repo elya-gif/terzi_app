@@ -219,9 +219,7 @@ class _CalendarOrderCard extends ConsumerWidget {
 
   Color _statusColor(BuildContext context, OrderStatus status) {
     switch (status) {
-      case OrderStatus.inProgress: return Colors.orange;
-      case OrderStatus.ready:      return Colors.green;
-      case OrderStatus.delivered:  return Colors.grey;
+      case OrderStatus.delivered: return Colors.grey;
       default: return Theme.of(context).colorScheme.primary;
     }
   }
@@ -250,9 +248,7 @@ class _StatusBadge extends StatelessWidget {
 
   Color _color(BuildContext context) {
     switch (status) {
-      case OrderStatus.inProgress: return Colors.orange;
-      case OrderStatus.ready:      return Colors.green;
-      case OrderStatus.delivered:  return Colors.grey;
+      case OrderStatus.delivered: return Colors.grey;
       default: return Theme.of(context).colorScheme.primary;
     }
   }

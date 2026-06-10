@@ -67,6 +67,19 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
     if (picked != null) setState(() => _deliveryDate = picked);
   }
 
+  Future<void> _pickCustomer() async {
+    final customers = ref.read(customerListProvider);
+    final result = await showModalBottomSheet<Customer>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _CustomerSearchSheet(customers: customers),
+    );
+    if (result != null) setState(() => _selectedCustomer = result);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCustomer == null) {
@@ -102,8 +115,16 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final customers = ref.watch(customerListProvider);
     final dateFormat = DateFormat('d MMMM yyyy', 'tr');
+
+    // Düzenlemede müşteri bilgisi order'dan gelir ama değiştirilebilir
+    if (_isEditing && _selectedCustomer == null) {
+      final customers = ref.read(customerListProvider);
+      try {
+        _selectedCustomer = customers
+            .firstWhere((c) => c.id == widget.order!.customerId);
+      } catch (_) {}
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -121,22 +142,28 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Müşteri seç
-            DropdownButtonFormField<Customer>(
-              value: _selectedCustomer,
-              decoration: InputDecoration(
-                labelText: 'Müşteri',
-                prefixIcon: const Icon(Icons.person_outline),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+            // Müşteri seç (arama butonlu)
+            GestureDetector(
+              onTap: _pickCustomer,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Müşteri',
+                  prefixIcon: const Icon(Icons.person_outline),
+                  suffixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  errorText: null,
+                ),
+                child: Text(
+                  _selectedCustomer?.name ?? 'Müşteri seçmek için dokunun',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: _selectedCustomer == null
+                        ? Theme.of(context).colorScheme.outline
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               ),
-              items: customers.map((c) {
-                return DropdownMenuItem(value: c, child: Text(c.name));
-              }).toList(),
-              onChanged: _isEditing
-                  ? null
-                  : (value) => setState(() => _selectedCustomer = value),
-              validator: (v) => v == null ? 'Müşteri seçin' : null,
             ),
             const SizedBox(height: 12),
 
@@ -185,7 +212,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Durum
+            // Durum (sadece alındı / teslim edildi)
             if (_isEditing) ...[
               DropdownButtonFormField<OrderStatus>(
                 value: _status,
@@ -260,5 +287,96 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
           .deleteOrder(widget.order!.id!);
       if (mounted) context.pop();
     }
+  }
+}
+
+class _CustomerSearchSheet extends StatefulWidget {
+  final List<Customer> customers;
+  const _CustomerSearchSheet({required this.customers});
+
+  @override
+  State<_CustomerSearchSheet> createState() => _CustomerSearchSheetState();
+}
+
+class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
+  final _searchController = TextEditingController();
+  List<Customer> _filtered = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.customers;
+    _searchController.addListener(_onSearch);
+  }
+
+  void _onSearch() {
+    final q = _searchController.text.toLowerCase();
+    setState(() {
+      _filtered = widget.customers
+          .where((c) => c.name.toLowerCase().contains(q))
+          .toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          TextField(
+            controller: _searchController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Müşteri ara...',
+              prefixIcon: const Icon(Icons.search),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.4,
+            ),
+            child: _filtered.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('Müşteri bulunamadı'),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _filtered.length,
+                    itemBuilder: (context, index) {
+                      final c = _filtered[index];
+                      return ListTile(
+                        leading: CircleAvatar(child: Text(c.name[0])),
+                        title: Text(c.name),
+                        subtitle: Text(c.phone),
+                        onTap: () => Navigator.pop(context, c),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }

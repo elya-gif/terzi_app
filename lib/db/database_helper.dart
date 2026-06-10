@@ -19,7 +19,12 @@ class DatabaseHelper {
   Future<Database> _initDB(String fileName) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, fileName);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
   }
 
   Future _createDB(Database db, int version) async {
@@ -41,10 +46,14 @@ class DatabaseHelper {
         chest REAL,
         waist REAL,
         hips REAL,
-        shoulder REAL,
+        upper_height REAL,
+        lower_height REAL,
         arm_length REAL,
-        leg_length REAL,
-        thigh REAL,
+        skirt_length REAL,
+        pant_length REAL,
+        vest_length REAL,
+        jacket_length REAL,
+        tunic_length REAL,
         notes TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers (id)
@@ -65,6 +74,18 @@ class DatabaseHelper {
         FOREIGN KEY (customer_id) REFERENCES customers (id)
       )
     ''');
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE measurements ADD COLUMN upper_height REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN lower_height REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN skirt_length REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN pant_length REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN vest_length REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN jacket_length REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN tunic_length REAL');
+    }
   }
 
   // --- Müşteri işlemleri ---

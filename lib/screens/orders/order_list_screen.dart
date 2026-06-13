@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/order.dart';
+import '../../providers/fitting_provider.dart';
 import '../../providers/order_provider.dart';
 
 final selectedStatusProvider = StateProvider<OrderStatus?>((ref) => null);
@@ -247,9 +248,11 @@ class _OrderCardContent extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (!isDelivered)
+              if (!isDelivered) ...[
+                const SizedBox(height: 6),
+                _FittingRow(customerId: order.customerId),
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 4),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -266,6 +269,7 @@ class _OrderCardContent extends ConsumerWidget {
                     ],
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -294,6 +298,47 @@ class _StatusBadge extends StatelessWidget {
         style: TextStyle(
             fontSize: 11, color: color, fontWeight: FontWeight.w500),
       ),
+    );
+  }
+}
+
+class _FittingRow extends ConsumerWidget {
+  final int customerId;
+  const _FittingRow({required this.customerId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fitting = ref.watch(nextFittingProvider(customerId));
+    if (fitting == null) return const SizedBox.shrink();
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final fittingDay = DateTime(
+        fitting.fittingDate.year, fitting.fittingDate.month, fitting.fittingDate.day);
+    final daysLeft = fittingDay.difference(today).inDays;
+
+    String label;
+    if (daysLeft == 0) {
+      label = 'Prova bugün!';
+    } else if (daysLeft == 1) {
+      label = 'Prova yarın';
+    } else {
+      label = 'Provaya $daysLeft gün kaldı';
+    }
+
+    return Row(
+      children: [
+        Icon(Icons.content_cut, size: 13, color: Colors.purple.shade400),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: daysLeft <= 1 ? Colors.purple.shade700 : Colors.purple.shade400,
+            fontWeight: daysLeft <= 1 ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 }

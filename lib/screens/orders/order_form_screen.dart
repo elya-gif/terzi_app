@@ -215,7 +215,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
             // Durum (sadece alındı / teslim edildi)
             if (_isEditing) ...[
               DropdownButtonFormField<OrderStatus>(
-                value: _status,
+                initialValue: _status,
                 decoration: InputDecoration(
                   labelText: 'Durum',
                   prefixIcon: const Icon(Icons.flag_outlined),

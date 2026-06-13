@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/customer.dart';
+import '../models/fitting.dart';
 import '../models/measurement.dart';
 import '../models/order.dart';
 
@@ -21,7 +22,7 @@ class DatabaseHelper {
     final path = join(dbPath, fileName);
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -74,6 +75,18 @@ class DatabaseHelper {
         FOREIGN KEY (customer_id) REFERENCES customers (id)
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE fittings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        customer_name TEXT NOT NULL,
+        fitting_date TEXT NOT NULL,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES customers (id)
+      )
+    ''');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -85,6 +98,19 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE measurements ADD COLUMN vest_length REAL');
       await db.execute('ALTER TABLE measurements ADD COLUMN jacket_length REAL');
       await db.execute('ALTER TABLE measurements ADD COLUMN tunic_length REAL');
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fittings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_id INTEGER NOT NULL,
+          customer_name TEXT NOT NULL,
+          fitting_date TEXT NOT NULL,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers (id)
+        )
+      ''');
     }
   }
 
@@ -183,5 +209,34 @@ class DatabaseHelper {
   Future<int> deleteOrder(int id) async {
     final db = await database;
     return await db.delete('orders', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Prova işlemleri ---
+
+  Future<int> insertFitting(Fitting fitting) async {
+    final db = await database;
+    return await db.insert('fittings', fitting.toMap());
+  }
+
+  Future<List<Fitting>> getFittings(int customerId) async {
+    final db = await database;
+    final maps = await db.query(
+      'fittings',
+      where: 'customer_id = ?',
+      whereArgs: [customerId],
+      orderBy: 'fitting_date ASC',
+    );
+    return maps.map((m) => Fitting.fromMap(m)).toList();
+  }
+
+  Future<List<Fitting>> getAllFittings() async {
+    final db = await database;
+    final maps = await db.query('fittings', orderBy: 'fitting_date ASC');
+    return maps.map((m) => Fitting.fromMap(m)).toList();
+  }
+
+  Future<int> deleteFitting(int id) async {
+    final db = await database;
+    return await db.delete('fittings', where: 'id = ?', whereArgs: [id]);
   }
 }

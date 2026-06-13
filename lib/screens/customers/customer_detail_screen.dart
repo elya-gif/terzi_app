@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/customer.dart';
+import '../../models/fitting.dart';
 import '../../models/measurement.dart';
 import '../../models/order.dart';
+import '../../providers/fitting_provider.dart';
 import '../../providers/measurement_provider.dart';
 import '../../providers/order_provider.dart';
 
@@ -24,7 +26,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -54,6 +56,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           tabs: const [
             Tab(text: 'Ölçüler'),
             Tab(text: 'Siparişler'),
+            Tab(text: 'Provalar'),
             Tab(text: 'Notlar'),
           ],
         ),
@@ -63,6 +66,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         children: [
           _MeasurementsTab(customer: customer),
           _OrdersTab(customer: customer),
+          _FittingsTab(customer: customer),
           _NotesTab(customer: customer),
         ],
       ),
@@ -86,9 +90,27 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             icon: const Icon(Icons.add),
             label: const Text('Sipariş Ekle'),
           );
+        } else if (_tabController.index == 2) {
+          return FloatingActionButton.extended(
+            onPressed: () => _showFittingForm(context),
+            icon: const Icon(Icons.content_cut),
+            label: const Text('Prova Ekle'),
+          );
         }
         return const SizedBox.shrink();
       },
+    );
+  }
+
+  void _showFittingForm(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => FittingFormSheet(customer: widget.customer),
     );
   }
 
@@ -463,6 +485,223 @@ class _MeasurementFormSheetState extends ConsumerState<MeasurementFormSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FittingsTab extends ConsumerWidget {
+  final Customer customer;
+  const _FittingsTab({required this.customer});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fittings = ref.watch(fittingProvider(customer.id!));
+    final dateFormat = DateFormat('d MMMM yyyy', 'tr');
+
+    if (fittings.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.content_cut, size: 56,
+                color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 16),
+            const Text('Henüz prova yok'),
+            const SizedBox(height: 8),
+            Text('Aşağıdaki butona bas',
+                style: TextStyle(color: Theme.of(context).colorScheme.outline)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: fittings.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final fitting = fittings[index];
+        final isPast = fitting.fittingDate.isBefore(DateTime.now());
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isPast
+                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                  : Theme.of(context).colorScheme.primaryContainer,
+              child: Icon(Icons.content_cut,
+                  size: 20,
+                  color: isPast
+                      ? Theme.of(context).colorScheme.outline
+                      : Theme.of(context).colorScheme.primary),
+            ),
+            title: Text(dateFormat.format(fitting.fittingDate),
+                style: const TextStyle(fontWeight: FontWeight.w500)),
+            subtitle: fitting.notes != null && fitting.notes!.isNotEmpty
+                ? Text(fitting.notes!, maxLines: 1, overflow: TextOverflow.ellipsis)
+                : null,
+            trailing: isPast
+                ? Text('Geçti',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.outline))
+                : Text(
+                    _daysUntil(fitting.fittingDate),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500),
+                  ),
+            onLongPress: () => _confirmDelete(context, ref, fitting),
+          ),
+        );
+      },
+    );
+  }
+
+  String _daysUntil(DateTime date) {
+    final diff = date.difference(DateTime.now()).inDays;
+    if (diff == 0) return 'Bugün';
+    if (diff == 1) return 'Yarın';
+    return '$diff gün sonra';
+  }
+
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref, Fitting fitting) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Provayı sil'),
+        content: const Text('Bu provayı silmek istediğine emin misin?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(fittingProvider(customer.id!).notifier).deleteFitting(fitting.id!);
+    }
+  }
+}
+
+class FittingFormSheet extends ConsumerStatefulWidget {
+  final Customer customer;
+  const FittingFormSheet({super.key, required this.customer});
+
+  @override
+  ConsumerState<FittingFormSheet> createState() => _FittingFormSheetState();
+}
+
+class _FittingFormSheetState extends ConsumerState<FittingFormSheet> {
+  DateTime _fittingDate = DateTime.now().add(const Duration(days: 3));
+  final _notesController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fittingDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+    if (picked != null) setState(() => _fittingDate = picked);
+  }
+
+  Future<void> _save() async {
+    setState(() => _isLoading = true);
+    final fitting = Fitting(
+      customerId: widget.customer.id!,
+      customerName: widget.customer.name,
+      fittingDate: _fittingDate,
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+    );
+    await ref
+        .read(fittingProvider(widget.customer.id!).notifier)
+        .addFitting(fitting);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('d MMMM yyyy', 'tr');
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+            16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+        child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Prova Ekle',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+              const Spacer(),
+              IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.calendar_today_outlined),
+            title: const Text('Prova Tarihi'),
+            subtitle: Text(dateFormat.format(_fittingDate),
+                style: const TextStyle(fontWeight: FontWeight.w500)),
+            trailing: const Icon(Icons.chevron_right),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline, width: 0.5),
+            ),
+            onTap: _pickDate,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: 'Not (opsiyonel)',
+              prefixIcon: const Icon(Icons.note_outlined),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _isLoading ? null : _save,
+              icon: _isLoading
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.notifications_active_outlined),
+              label: const Text('Kaydet & Bildirim Kur'),
+            ),
+          ),
+        ],
+        ),
       ),
     );
   }

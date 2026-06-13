@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import '../models/fitting.dart';
 import '../models/order.dart';
 
 class NotificationService {
@@ -97,5 +98,71 @@ class NotificationService {
   Future<void> cancelReminder(int orderId) async {
     await _plugin.cancel(orderId);
     await _plugin.cancel(orderId + 10000);
+  }
+
+  Future<void> scheduleFittingReminder(Fitting fitting) async {
+    if (fitting.id == null) return;
+
+    // Prova günü sabah 08:00'de bildirim
+    final scheduledTime = tz.TZDateTime(
+      tz.local,
+      fitting.fittingDate.year,
+      fitting.fittingDate.month,
+      fitting.fittingDate.day,
+      8,
+      0,
+    );
+
+    if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) return;
+
+    final notifId = fitting.id! + 20000;
+    await _plugin.zonedSchedule(
+      notifId,
+      'Prova günü!',
+      '${fitting.customerName} için bugün prova var.',
+      scheduledTime,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'fitting_reminders',
+          'Prova Hatırlatıcıları',
+          channelDescription: 'Prova günü sabahı bildirir',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+
+    // Bir gün önce de hatırlatıcı
+    final dayBefore = scheduledTime.subtract(const Duration(days: 1));
+    if (dayBefore.isAfter(tz.TZDateTime.now(tz.local))) {
+      await _plugin.zonedSchedule(
+        notifId + 1,
+        'Yarın prova var!',
+        '${fitting.customerName} için yarın prova randevusu.',
+        dayBefore,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'fitting_reminders',
+            'Prova Hatırlatıcıları',
+            channelDescription: 'Prova günü sabahı bildirir',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    }
+  }
+
+  Future<void> cancelFittingReminder(int fittingId) async {
+    await _plugin.cancel(fittingId + 20000);
+    await _plugin.cancel(fittingId + 20001);
   }
 }

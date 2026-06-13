@@ -16,10 +16,8 @@ class OrderCard extends StatelessWidget {
 
   Color _statusColor(BuildContext context) {
     switch (order.status) {
-      case OrderStatus.inProgress: return Colors.orange;
-      case OrderStatus.ready:      return Colors.green;
-      case OrderStatus.delivered:  return Colors.grey;
-      default: return Theme.of(context).colorScheme.primary;
+      case OrderStatus.delivered: return Colors.grey;
+      case OrderStatus.received:  return Theme.of(context).colorScheme.primary;
     }
   }
 

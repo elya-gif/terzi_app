@@ -8,18 +8,58 @@ import '../../providers/fitting_provider.dart';
 import '../../providers/order_provider.dart';
 
 final selectedStatusProvider = StateProvider<OrderStatus?>((ref) => null);
+final orderSearchQueryProvider = StateProvider<String>((ref) => '');
 
-class OrderListScreen extends ConsumerWidget {
+class OrderListScreen extends ConsumerStatefulWidget {
   const OrderListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrderListScreen> createState() => _OrderListScreenState();
+}
+
+class _OrderListScreenState extends ConsumerState<OrderListScreen> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final orders = ref.watch(orderListProvider);
     final selectedStatus = ref.watch(selectedStatusProvider);
+    final query = ref.watch(orderSearchQueryProvider);
 
-    final filtered = selectedStatus == null
-        ? orders
-        : orders.where((o) => o.status == selectedStatus).toList();
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+
+    // Yarın teslim edilecek aktif siparişler (filtre/arama bağımsız, her zaman göster)
+    final tomorrowOrders = orders.where((o) {
+      if (o.status == OrderStatus.delivered) return false;
+      final d = DateTime(o.deliveryDate.year, o.deliveryDate.month, o.deliveryDate.day);
+      return d == tomorrow;
+    }).toList();
+
+    // Teslim edildi filtresi seçiliyse tüm teslim edilenleri göster,
+    // aksi halde sadece aktif siparişleri göster
+    var filtered = selectedStatus == OrderStatus.delivered
+        ? orders.where((o) => o.status == OrderStatus.delivered).toList()
+        : orders.where((o) => o.status != OrderStatus.delivered).toList();
+
+    if (selectedStatus != null && selectedStatus != OrderStatus.delivered) {
+      filtered = filtered.where((o) => o.status == selectedStatus).toList();
+    }
+
+    if (query.isNotEmpty) {
+      final q = query.toLowerCase();
+      filtered = filtered
+          .where((o) =>
+              o.productName.toLowerCase().contains(q) ||
+              o.customerName.toLowerCase().contains(q))
+          .toList();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -27,16 +67,44 @@ class OrderListScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: SearchBar(
+              controller: _searchController,
+              hintText: 'Sipariş veya müşteri ara...',
+              leading: const Icon(Icons.search, size: 20),
+              onChanged: (v) =>
+                  ref.read(orderSearchQueryProvider.notifier).state = v,
+            ),
+          ),
           _StatusFilter(),
           Expanded(
-            child: filtered.isEmpty
+            child: filtered.isEmpty && tomorrowOrders.isEmpty
                 ? const _EmptyState()
-                : ListView.separated(
+                : ListView(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) =>
-                        _SwipeableOrderCard(order: filtered[index]),
+                    children: [
+                      // Yarın teslim bölümü (arama yoksa ve teslim edildi filtresi seçili değilse göster)
+                      if (tomorrowOrders.isNotEmpty && query.isEmpty && selectedStatus != OrderStatus.delivered) ...[
+                        _SectionLabel(
+                          label: 'Yarın Teslim',
+                          icon: Icons.schedule,
+                          color: Colors.orange.shade700,
+                        ),
+                        const SizedBox(height: 8),
+                        ...tomorrowOrders.map((o) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _SwipeableOrderCard(order: o),
+                            )),
+                        const SizedBox(height: 12),
+                        Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
+                        const SizedBox(height: 12),
+                      ],
+                      ...filtered.map((o) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _SwipeableOrderCard(order: o),
+                          )),
+                    ],
                   ),
           ),
         ],
@@ -46,6 +114,29 @@ class OrderListScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('Yeni Sipariş'),
       ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  const _SectionLabel({required this.label, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            )),
+      ],
     );
   }
 }
@@ -61,20 +152,17 @@ class _StatusFilter extends ConsumerWidget {
       child: Row(
         children: [
           _FilterChip(
-            label: 'Tümü',
+            label: 'Hepsi',
             selected: selected == null,
             onTap: () => ref.read(selectedStatusProvider.notifier).state = null,
           ),
           const SizedBox(width: 8),
-          ...OrderStatus.values.map((status) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: _FilterChip(
-                  label: status.label,
-                  selected: selected == status,
-                  onTap: () =>
-                      ref.read(selectedStatusProvider.notifier).state = status,
-                ),
-              )),
+          _FilterChip(
+            label: 'Teslim Edildi',
+            selected: selected == OrderStatus.delivered,
+            onTap: () => ref.read(selectedStatusProvider.notifier).state =
+                OrderStatus.delivered,
+          ),
         ],
       ),
     );
@@ -176,7 +264,12 @@ class _OrderCardContent extends ConsumerWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/orders/${order.id}/edit', extra: order),
+        onTap: isDelivered
+            ? null
+            : () => context.push('/orders/${order.id}/edit', extra: order),
+        onLongPress: isDelivered
+            ? () => _confirmDelete(context, ref)
+            : null,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -275,6 +368,31 @@ class _OrderCardContent extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Siparişi sil'),
+        content: Text('"${order.productName}" siparişini silmek istediğine emin misin?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(orderListProvider.notifier).deleteOrder(order.id!);
+    }
   }
 }
 

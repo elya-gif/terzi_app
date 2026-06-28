@@ -16,7 +16,15 @@ class NotificationService {
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: androidSettings);
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    const settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
     await _plugin.initialize(settings);
 
     await _plugin
@@ -25,10 +33,41 @@ class NotificationService {
         ?.requestNotificationsPermission();
   }
 
+  static const _deliveryDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'delivery_reminders',
+      'Teslim Hatırlatıcıları',
+      channelDescription: 'Sipariş teslim tarihi yaklaşınca bildirir',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    ),
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+  );
+
+  static const _fittingDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'fitting_reminders',
+      'Prova Hatırlatıcıları',
+      channelDescription: 'Prova günü sabahı bildirir',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    ),
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+  );
+
   Future<void> scheduleDeliveryReminder(Order order) async {
     if (order.id == null) return;
 
-    // 2 gün önce saat 09:00'da bildirim gönder
     final reminderDate = order.deliveryDate.subtract(const Duration(days: 2));
     final scheduledTime = tz.TZDateTime(
       tz.local,
@@ -39,29 +78,19 @@ class NotificationService {
       0,
     );
 
-    if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) return;
+    if (scheduledTime.isAfter(tz.TZDateTime.now(tz.local))) {
+      await _plugin.zonedSchedule(
+        order.id!,
+        'Teslim tarihi yaklaşıyor!',
+        '${order.customerName} - ${order.productName} için 2 gün kaldı.',
+        scheduledTime,
+        _deliveryDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    }
 
-    await _plugin.zonedSchedule(
-      order.id!,
-      'Teslim tarihi yaklaşıyor!',
-      '${order.customerName} - ${order.productName} için 2 gün kaldı.',
-      scheduledTime,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'delivery_reminders',
-          'Teslim Hatırlatıcıları',
-          channelDescription: 'Sipariş teslim tarihi yaklaşınca bildirir',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-
-    // 1 gün önce saat 09:00'da ikinci bildirim
     final reminderDate1 = order.deliveryDate.subtract(const Duration(days: 1));
     final scheduledTime1 = tz.TZDateTime(
       tz.local,
@@ -78,16 +107,7 @@ class NotificationService {
         'Teslim tarihi yarın!',
         '${order.customerName} - ${order.productName} yarın teslim edilecek.',
         scheduledTime1,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'delivery_reminders',
-            'Teslim Hatırlatıcıları',
-            channelDescription: 'Sipariş teslim tarihi yaklaşınca bildirir',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-          ),
-        ),
+        _deliveryDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -103,7 +123,6 @@ class NotificationService {
   Future<void> scheduleFittingReminder(Fitting fitting) async {
     if (fitting.id == null) return;
 
-    // Prova günü sabah 08:00'de bildirim
     final scheduledTime = tz.TZDateTime(
       tz.local,
       fitting.fittingDate.year,
@@ -116,44 +135,28 @@ class NotificationService {
     if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) return;
 
     final notifId = fitting.id! + 20000;
+    final productPart =
+        fitting.productName != null ? ' (${fitting.productName})' : '';
+
     await _plugin.zonedSchedule(
       notifId,
       'Prova günü!',
-      '${fitting.customerName} için bugün prova var.',
+      '${fitting.customerName}$productPart için bugün prova var.',
       scheduledTime,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'fitting_reminders',
-          'Prova Hatırlatıcıları',
-          channelDescription: 'Prova günü sabahı bildirir',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-      ),
+      _fittingDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
 
-    // Bir gün önce de hatırlatıcı
     final dayBefore = scheduledTime.subtract(const Duration(days: 1));
     if (dayBefore.isAfter(tz.TZDateTime.now(tz.local))) {
       await _plugin.zonedSchedule(
         notifId + 1,
         'Yarın prova var!',
-        '${fitting.customerName} için yarın prova randevusu.',
+        '${fitting.customerName}$productPart için yarın prova randevusu.',
         dayBefore,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'fitting_reminders',
-            'Prova Hatırlatıcıları',
-            channelDescription: 'Prova günü sabahı bildirir',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-          ),
-        ),
+        _fittingDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,

@@ -22,7 +22,7 @@ class MeasurementNotifier extends StateNotifier<List<Measurement>> {
 
   Future<void> addMeasurement(Measurement measurement) async {
     final id = await DatabaseHelper.instance.insertMeasurement(measurement);
-    final newMeasurement = Measurement(
+    final saved = Measurement(
       id: id,
       customerId: measurement.customerId,
       chest: measurement.chest,
@@ -36,16 +36,16 @@ class MeasurementNotifier extends StateNotifier<List<Measurement>> {
       vestLength: measurement.vestLength,
       jacketLength: measurement.jacketLength,
       tunicLength: measurement.tunicLength,
+      upperBodyLength: measurement.upperBodyLength,
+      shortLength: measurement.shortLength,
       notes: measurement.notes,
       createdAt: measurement.createdAt,
     );
-    state = [newMeasurement, ...state];
+    state = [saved, ...state];
   }
 
   Future<void> updateMeasurement(Measurement measurement) async {
     await DatabaseHelper.instance.updateMeasurement(measurement);
-    state = state
-        .map((m) => m.id == measurement.id ? measurement : m)
-        .toList();
+    state = state.map((m) => m.id == measurement.id ? measurement : m).toList();
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/customers/customer_list_screen.dart';
@@ -7,6 +8,7 @@ import 'screens/customers/customer_form_screen.dart';
 import 'screens/orders/order_list_screen.dart';
 import 'screens/orders/order_form_screen.dart';
 import 'screens/calendar/calendar_screen.dart';
+import 'screens/receivables/receivables_screen.dart';
 import 'models/customer.dart';
 import 'models/order.dart';
 
@@ -39,6 +41,10 @@ final _router = GoRouter(
         GoRoute(
           path: '/calendar',
           builder: (context, state) => const CalendarScreen(),
+        ),
+        GoRoute(
+          path: '/receivables',
+          builder: (context, state) => const ReceivablesScreen(),
         ),
       ],
     ),
@@ -85,6 +91,13 @@ class TerziApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Terzi Yönetim',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('tr'), Locale('en')],
+      locale: const Locale('tr'),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF185FA5),
@@ -118,6 +131,7 @@ class MainScaffold extends StatelessWidget {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith('/orders')) return 1;
     if (location.startsWith('/calendar')) return 2;
+    if (location.startsWith('/receivables')) return 3;
     return 0;
   }
 
@@ -138,6 +152,9 @@ class MainScaffold extends StatelessWidget {
             case 2:
               context.go('/calendar');
               break;
+            case 3:
+              context.go('/receivables');
+              break;
           }
         },
         destinations: const [
@@ -155,6 +172,11 @@ class MainScaffold extends StatelessWidget {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Takvim',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet),
+            label: 'Alacaklar',
           ),
         ],
       ),

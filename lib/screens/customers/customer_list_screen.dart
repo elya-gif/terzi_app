@@ -4,7 +4,19 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/customer_provider.dart';
 import '../../models/customer.dart';
+import '../../widgets/alpha_scroll_list.dart';
 
+final searchQueryProvider = StateProvider<String>((ref) => '');
+
+final filteredCustomersProvider = Provider<List<Customer>>((ref) {
+  final customers = ref.watch(customerListProvider);
+  final query = ref.watch(searchQueryProvider).toLowerCase();
+  if (query.isEmpty) return customers;
+  return customers.where((c) =>
+    c.name.toLowerCase().contains(query) ||
+    c.phone.contains(query)
+  ).toList();
+});
 
 class CustomerListScreen extends ConsumerWidget {
   const CustomerListScreen({super.key});
@@ -46,18 +58,6 @@ class CustomerListScreen extends ConsumerWidget {
   }
 }
 
-final searchQueryProvider = StateProvider<String>((ref) => '');
-
-final filteredCustomersProvider = Provider<List<Customer>>((ref) {
-  final customers = ref.watch(customerListProvider);
-  final query = ref.watch(searchQueryProvider).toLowerCase();
-  if (query.isEmpty) return customers;
-  return customers.where((c) =>
-    c.name.toLowerCase().contains(query) ||
-    c.phone.contains(query)
-  ).toList();
-});
-
 class _CustomerList extends ConsumerWidget {
   final List<Customer> customers;
   const _CustomerList({required this.customers});
@@ -72,14 +72,10 @@ class _CustomerList extends ConsumerWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: filtered.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final customer = filtered[index];
-        return _CustomerCard(customer: customer);
-      },
+    return AlphaScrollList<Customer>(
+      items: filtered,
+      labelOf: (c) => c.name,
+      itemBuilder: (context, customer) => _CustomerCard(customer: customer),
     );
   }
 }

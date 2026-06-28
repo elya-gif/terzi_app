@@ -17,24 +17,42 @@ class CalendarScreen extends ConsumerWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
+    // Yaklaşan: bugün dahil gelecek teslimler (gün bazında)
     final upcomingOrders = orders
-        .where((o) =>
-            o.status != OrderStatus.delivered &&
-            o.deliveryDate.isAfter(now.subtract(const Duration(days: 1))))
+        .where((o) {
+          if (o.status == OrderStatus.delivered) return false;
+          final d = DateTime(o.deliveryDate.year, o.deliveryDate.month, o.deliveryDate.day);
+          return !d.isBefore(today);
+        })
         .toList()
       ..sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
 
+    // Geciken: teslim günü geçmiş olanlar (gün bazında)
     final overdueOrders = orders
-        .where((o) =>
-            o.status != OrderStatus.delivered &&
-            o.deliveryDate.isBefore(now))
+        .where((o) {
+          if (o.status == OrderStatus.delivered) return false;
+          final d = DateTime(o.deliveryDate.year, o.deliveryDate.month, o.deliveryDate.day);
+          return d.isBefore(today);
+        })
         .toList()
       ..sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
+
+    // Teslim edilmiş siparişlerin orderId'leri
+    final deliveredOrderIds = orders
+        .where((o) => o.status == OrderStatus.delivered)
+        .map((o) => o.id)
+        .toSet();
 
     final upcomingFittings = fittings
-        .where((f) => !DateTime(f.fittingDate.year, f.fittingDate.month,
-                f.fittingDate.day)
-            .isBefore(today))
+        .where((f) {
+          // Teslim edilen siparişe ait provaları gösterme
+          if (f.orderId != null && deliveredOrderIds.contains(f.orderId)) {
+            return false;
+          }
+          return !DateTime(f.fittingDate.year, f.fittingDate.month,
+                  f.fittingDate.day)
+              .isBefore(today);
+        })
         .toList()
       ..sort((a, b) => a.fittingDate.compareTo(b.fittingDate));
 
@@ -164,12 +182,12 @@ class _DateHeader extends StatelessWidget {
   }
 }
 
-class _CalendarFittingCard extends StatelessWidget {
+class _CalendarFittingCard extends ConsumerWidget {
   final Fitting fitting;
   const _CalendarFittingCard({required this.fitting});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final fittingDay = DateTime(
@@ -189,82 +207,117 @@ class _CalendarFittingCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.purple,
-                borderRadius: BorderRadius.circular(2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onLongPress: () => _confirmDelete(context, ref),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.purple,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fitting.customerName,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  if (fitting.notes != null && fitting.notes!.isNotEmpty)
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      fitting.notes!,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.outline),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    )
-                  else
-                    Text(
-                      DateFormat('d MMMM yyyy', 'tr').format(fitting.fittingDate),
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.outline),
+                      fitting.customerName,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
+                    if (fitting.productName != null)
+                      Text(
+                        fitting.productName!,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    if (fitting.notes != null && fitting.notes!.isNotEmpty)
+                      Text(
+                        fitting.notes!,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.outline),
+                      )
+                    else
+                      Text(
+                        DateFormat('d MMMM yyyy, EEEE', 'tr').format(fitting.fittingDate),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.outline),
+                      ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Prova',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.purple,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    daysLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isUrgent
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.outline,
+                      fontWeight: isUrgent ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Prova',
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.purple,
-                        fontWeight: FontWeight.w500),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  daysLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isUrgent
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.outline,
-                    fontWeight:
-                        isUrgent ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Provayı sil'),
+        content: Text('${fitting.customerName} müşterisinin provasını silmek istediğine emin misin?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref
+          .read(fittingProvider(fitting.customerId).notifier)
+          .deleteFitting(fitting.id!);
+    }
   }
 }
 
@@ -285,11 +338,12 @@ class _CalendarOrderCard extends ConsumerWidget {
         onTap: () => context.push('/orders/${order.id}/edit', extra: order),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Container(
                 width: 4,
-                height: 50,
                 decoration: BoxDecoration(
                   color: isOverdue
                       ? Theme.of(context).colorScheme.error
@@ -318,6 +372,7 @@ class _CalendarOrderCard extends ConsumerWidget {
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _StatusBadge(status: order.status),
                   const SizedBox(height: 4),
@@ -340,6 +395,7 @@ class _CalendarOrderCard extends ConsumerWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

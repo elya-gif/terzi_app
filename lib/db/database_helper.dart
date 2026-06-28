@@ -4,6 +4,8 @@ import '../models/customer.dart';
 import '../models/fitting.dart';
 import '../models/measurement.dart';
 import '../models/order.dart';
+import '../models/payment_record.dart';
+import '../services/notification_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -22,7 +24,7 @@ class DatabaseHelper {
     final path = join(dbPath, fileName);
     return await openDatabase(
       path,
-      version: 3,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -55,6 +57,8 @@ class DatabaseHelper {
         vest_length REAL,
         jacket_length REAL,
         tunic_length REAL,
+        upper_body_length REAL,
+        short_length REAL,
         notes TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers (id)
@@ -68,6 +72,7 @@ class DatabaseHelper {
         customer_name TEXT NOT NULL,
         product_name TEXT NOT NULL,
         price REAL NOT NULL,
+        paid_amount REAL NOT NULL DEFAULT 0,
         status TEXT NOT NULL,
         delivery_date TEXT NOT NULL,
         notes TEXT,
@@ -81,10 +86,23 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_id INTEGER NOT NULL,
         customer_name TEXT NOT NULL,
+        order_id INTEGER,
+        product_name TEXT,
         fitting_date TEXT NOT NULL,
         notes TEXT,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (customer_id) REFERENCES customers (id)
+        FOREIGN KEY (customer_id) REFERENCES customers (id),
+        FOREIGN KEY (order_id) REFERENCES orders (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        paid_at TEXT NOT NULL,
+        FOREIGN KEY (order_id) REFERENCES orders (id)
       )
     ''');
   }
@@ -109,6 +127,26 @@ class DatabaseHelper {
           notes TEXT,
           created_at TEXT NOT NULL,
           FOREIGN KEY (customer_id) REFERENCES customers (id)
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE measurements ADD COLUMN upper_body_length REAL');
+      await db.execute('ALTER TABLE measurements ADD COLUMN short_length REAL');
+      await db.execute('ALTER TABLE fittings ADD COLUMN order_id INTEGER');
+      await db.execute('ALTER TABLE fittings ADD COLUMN product_name TEXT');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE orders ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0');
+    }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          order_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          paid_at TEXT NOT NULL,
+          FOREIGN KEY (order_id) REFERENCES orders (id)
         )
       ''');
     }
@@ -140,7 +178,13 @@ class DatabaseHelper {
   Future<int> deleteCustomer(int id) async {
     final db = await database;
     await db.delete('measurements', where: 'customer_id = ?', whereArgs: [id]);
+    // Önce müşteriye ait siparişlerin ödemelerini sil
+    final orders = await db.query('orders', columns: ['id'], where: 'customer_id = ?', whereArgs: [id]);
+    for (final o in orders) {
+      await db.delete('payments', where: 'order_id = ?', whereArgs: [o['id']]);
+    }
     await db.delete('orders', where: 'customer_id = ?', whereArgs: [id]);
+    await db.delete('fittings', where: 'customer_id = ?', whereArgs: [id]);
     return await db.delete('customers', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -208,7 +252,26 @@ class DatabaseHelper {
 
   Future<int> deleteOrder(int id) async {
     final db = await database;
+    await db.delete('payments', where: 'order_id = ?', whereArgs: [id]);
     return await db.delete('orders', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Ödeme işlemleri ---
+
+  Future<int> insertPayment(PaymentRecord payment) async {
+    final db = await database;
+    return await db.insert('payments', payment.toMap());
+  }
+
+  Future<List<PaymentRecord>> getPaymentsByOrder(int orderId) async {
+    final db = await database;
+    final maps = await db.query(
+      'payments',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+      orderBy: 'paid_at ASC',
+    );
+    return maps.map((m) => PaymentRecord.fromMap(m)).toList();
   }
 
   // --- Prova işlemleri ---
@@ -233,6 +296,26 @@ class DatabaseHelper {
     final db = await database;
     final maps = await db.query('fittings', orderBy: 'fitting_date ASC');
     return maps.map((m) => Fitting.fromMap(m)).toList();
+  }
+
+  Future<void> deleteFittingsByOrder(int orderId) async {
+    final db = await database;
+    final fittings = await db.query('fittings',
+        columns: ['id'], where: 'order_id = ?', whereArgs: [orderId]);
+    for (final f in fittings) {
+      await NotificationService.instance.cancelFittingReminder(f['id'] as int);
+    }
+    await db.delete('fittings', where: 'order_id = ?', whereArgs: [orderId]);
+  }
+
+  Future<int> updateFitting(Fitting fitting) async {
+    final db = await database;
+    return await db.update(
+      'fittings',
+      fitting.toMap(),
+      where: 'id = ?',
+      whereArgs: [fitting.id],
+    );
   }
 
   Future<int> deleteFitting(int id) async {

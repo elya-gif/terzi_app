@@ -63,6 +63,15 @@ class FittingNotifier extends StateNotifier<List<Fitting>> {
     _ref.read(allFittingsProvider.notifier).reload();
   }
 
+  Future<void> updateFitting(Fitting fitting) async {
+    await DatabaseHelper.instance.updateFitting(fitting);
+    await NotificationService.instance.cancelFittingReminder(fitting.id!);
+    await NotificationService.instance.scheduleFittingReminder(fitting);
+    state = state.map((f) => f.id == fitting.id ? fitting : f).toList()
+      ..sort((a, b) => a.fittingDate.compareTo(b.fittingDate));
+    _ref.read(allFittingsProvider.notifier).reload();
+  }
+
   Future<void> deleteFitting(int id) async {
     await DatabaseHelper.instance.deleteFitting(id);
     await NotificationService.instance.cancelFittingReminder(id);

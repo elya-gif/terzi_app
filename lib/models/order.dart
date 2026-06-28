@@ -26,6 +26,7 @@ class Order {
   final String customerName;
   final String productName;
   final double price;
+  final double paidAmount;
   final OrderStatus status;
   final DateTime deliveryDate;
   final String? notes;
@@ -37,11 +38,14 @@ class Order {
     required this.customerName,
     required this.productName,
     required this.price,
+    this.paidAmount = 0,
     this.status = OrderStatus.received,
     required this.deliveryDate,
     this.notes,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  double get remainingDebt => price - paidAmount;
 
   Map<String, dynamic> toMap() {
     return {
@@ -50,6 +54,7 @@ class Order {
       'customer_name': customerName,
       'product_name': productName,
       'price': price,
+      'paid_amount': paidAmount,
       'status': status.value,
       'delivery_date': deliveryDate.toIso8601String(),
       'notes': notes,
@@ -64,6 +69,7 @@ class Order {
       customerName: map['customer_name'],
       productName: map['product_name'],
       price: map['price']?.toDouble() ?? 0.0,
+      paidAmount: map['paid_amount']?.toDouble() ?? 0.0,
       status: OrderStatusExtension.fromString(map['status']),
       deliveryDate: DateTime.parse(map['delivery_date']),
       notes: map['notes'],
@@ -75,6 +81,7 @@ class Order {
     int? id,
     String? productName,
     double? price,
+    double? paidAmount,
     OrderStatus? status,
     DateTime? deliveryDate,
     String? notes,
@@ -85,6 +92,7 @@ class Order {
       customerName: customerName,
       productName: productName ?? this.productName,
       price: price ?? this.price,
+      paidAmount: paidAmount ?? this.paidAmount,
       status: status ?? this.status,
       deliveryDate: deliveryDate ?? this.deliveryDate,
       notes: notes ?? this.notes,

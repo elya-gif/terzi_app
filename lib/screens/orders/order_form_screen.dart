@@ -58,11 +58,14 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final picked = await showDatePicker(
       context: context,
-      initialDate: _deliveryDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      initialDate: _deliveryDate.isBefore(today) ? today : _deliveryDate,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365 * 2)),
+      locale: const Locale('tr'),
     );
     if (picked != null) setState(() => _deliveryDate = picked);
   }
@@ -89,6 +92,45 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
       return;
     }
 
+    // Teslim edildi seçildiyse borç ekranını göster
+    if (_isEditing &&
+        _status == OrderStatus.delivered &&
+        widget.order?.status != OrderStatus.delivered) {
+      final price = double.tryParse(_priceController.text.trim()) ?? widget.order!.price;
+      final prevPaid = widget.order?.paidAmount ?? 0;
+      final paid = await _showDebtDialog(price, prevPaid);
+      if (paid == null) {
+        // Kullanıcı iptal etti, durumu geri al
+        setState(() => _status = OrderStatus.received);
+        return;
+      }
+      setState(() => _isLoading = true);
+      // Önce sipariş alanlarını (fiyat, durum, notlar) güncelle
+      final extra = paid - prevPaid; // bu teslimatta alınan yeni miktar
+      final baseOrder = Order(
+        id: widget.order?.id,
+        customerId: _selectedCustomer!.id!,
+        customerName: _selectedCustomer!.name,
+        productName: _productController.text.trim(),
+        price: price,
+        paidAmount: prevPaid, // addPaymentToOrder zaten üstüne ekleyecek
+        status: _status,
+        deliveryDate: _deliveryDate,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+      );
+      await ref.read(orderListProvider.notifier).updateOrder(baseOrder);
+      // Yeni ödeme miktarı varsa payments tablosuna tarihli kaydet
+      if (extra > 0) {
+        await ref
+            .read(orderListProvider.notifier)
+            .addPaymentToOrder(baseOrder, extra);
+      }
+      if (mounted) context.pop();
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final order = Order(
@@ -97,6 +139,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
       customerName: _selectedCustomer!.name,
       productName: _productController.text.trim(),
       price: double.tryParse(_priceController.text.trim()) ?? 0,
+      paidAmount: widget.order?.paidAmount ?? 0,
       status: _status,
       deliveryDate: _deliveryDate,
       notes: _notesController.text.trim().isEmpty
@@ -111,6 +154,69 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
     }
 
     if (mounted) context.pop();
+  }
+
+  Future<double?> _showDebtDialog(double totalPrice, double prevPaid) async {
+    final remaining = totalPrice - prevPaid;
+    final controller = TextEditingController(
+      text: remaining > 0 ? remaining.toStringAsFixed(0) : '0',
+    );
+    return showDialog<double>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ödeme Durumu'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Toplam tutar: ₺${totalPrice.toStringAsFixed(0)}'),
+            if (prevPaid > 0)
+              Text('Daha önce ödendi: ₺${prevPaid.toStringAsFixed(0)}'),
+            if (remaining > 0) ...[
+              Text(
+                'Kalan borç: ₺${remaining.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(ctx).colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Bu teslimatta alınan ödeme:'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: InputDecoration(
+                  prefixText: '₺',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  hintText: 'Tutar girin',
+                ),
+              ),
+            ] else
+              const Text('Tüm ödeme alınmış.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final extra = double.tryParse(controller.text.trim()) ?? 0;
+              // prevPaid + extra toplamını döndür (sınırlı)
+              final totalPaid = (prevPaid + extra).clamp(0.0, totalPrice);
+              Navigator.pop(ctx, totalPaid);
+            },
+            child: const Text('Onayla'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -170,11 +276,14 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
             // Ürün adı
             TextFormField(
               controller: _productController,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
               decoration: InputDecoration(
                 labelText: 'Ürün / İş Tanımı',
                 prefixIcon: const Icon(Icons.checkroom_outlined),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12)),
+                alignLabelWithHint: true,
               ),
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Ürün adı gerekli' : null,

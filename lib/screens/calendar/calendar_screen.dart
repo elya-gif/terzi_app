@@ -6,6 +6,8 @@ import '../../models/fitting.dart';
 import '../../models/order.dart';
 import '../../providers/fitting_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/atelier.dart';
 
 class CalendarScreen extends ConsumerWidget {
   const CalendarScreen({super.key});
@@ -66,32 +68,29 @@ class CalendarScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 if (overdueOrders.isNotEmpty) ...[
-                  _SectionHeader(
-                    title: 'Geciken Siparişler',
+                  SectionHeading(
+                    label: 'Geciken Siparişler',
                     color: Theme.of(context).colorScheme.error,
                     icon: Icons.warning_amber_outlined,
                   ),
-                  const SizedBox(height: 8),
                   ...overdueOrders.map((o) => _CalendarOrderCard(order: o)),
                   const SizedBox(height: 16),
                 ],
                 if (upcomingFittings.isNotEmpty) ...[
-                  _SectionHeader(
-                    title: 'Yaklaşan Provalar',
-                    color: Colors.purple,
+                  SectionHeading(
+                    label: 'Yaklaşan Provalar',
+                    color: Theme.of(context).extension<AtelierColors>()!.plum,
                     icon: Icons.content_cut,
                   ),
-                  const SizedBox(height: 8),
                   ...upcomingFittings.map((f) => _CalendarFittingCard(fitting: f)),
                   const SizedBox(height: 16),
                 ],
                 if (upcomingOrders.isNotEmpty) ...[
-                  _SectionHeader(
-                    title: 'Yaklaşan Teslimler',
-                    color: Theme.of(context).colorScheme.primary,
+                  SectionHeading(
+                    label: 'Yaklaşan Teslimler',
+                    color: Theme.of(context).extension<AtelierColors>()!.brass,
                     icon: Icons.calendar_today_outlined,
                   ),
-                  const SizedBox(height: 8),
                   ..._groupByDate(upcomingOrders).entries.map((entry) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,29 +118,6 @@ class CalendarScreen extends ConsumerWidget {
       map.putIfAbsent(date, () => []).add(order);
     }
     return map;
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final Color color;
-  final IconData icon;
-  const _SectionHeader(
-      {required this.title, required this.color, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w500, color: color),
-        ),
-      ],
-    );
   }
 }
 
@@ -204,25 +180,19 @@ class _CalendarFittingCard extends ConsumerWidget {
     }
 
     final isUrgent = daysLeft <= 1;
+    final plum = Theme.of(context).extension<AtelierColors>()!.plum;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onLongPress: () => _confirmDelete(context, ref),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              Container(
-                width: 4,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.purple,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
+              SeamAccent(color: plum, height: 48),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,8 +206,8 @@ class _CalendarFittingCard extends ConsumerWidget {
                         fitting.productName!,
                         style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500),
+                            color: plum,
+                            fontWeight: FontWeight.w600),
                       ),
                     if (fitting.notes != null && fitting.notes!.isNotEmpty)
                       Text(
@@ -260,17 +230,18 @@ class _CalendarFittingCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
+                      color: plum.withValues(alpha: 0.13),
+                      borderRadius: BorderRadius.circular(7),
                     ),
-                    child: const Text(
-                      'Prova',
+                    child: Text(
+                      'PROVA',
                       style: TextStyle(
                           fontSize: 10,
-                          color: Colors.purple,
-                          fontWeight: FontWeight.w500),
+                          color: plum,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -328,13 +299,14 @@ class _CalendarOrderCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
     final isOverdue = order.deliveryDate.isBefore(now);
     final daysLeft = order.deliveryDate.difference(now).inDays;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => context.push('/orders/${order.id}/edit', extra: order),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -342,16 +314,12 @@ class _CalendarOrderCard extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              Container(
-                width: 4,
-                decoration: BoxDecoration(
-                  color: isOverdue
-                      ? Theme.of(context).colorScheme.error
-                      : Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+              SeamAccent(
+                color: isOverdue
+                    ? Theme.of(context).colorScheme.error
+                    : atelier.brass,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,19 +374,22 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = status == OrderStatus.delivered
-        ? Colors.grey
-        : Theme.of(context).colorScheme.primary;
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
+    final color =
+        status == OrderStatus.delivered ? atelier.sage : atelier.brass;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
+        color: color.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(7),
       ),
       child: Text(
         status.label,
         style: TextStyle(
-            fontSize: 10, color: color, fontWeight: FontWeight.w500),
+            fontSize: 10,
+            color: color,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2),
       ),
     );
   }

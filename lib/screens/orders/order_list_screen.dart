@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../models/order.dart';
 import '../../providers/fitting_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/atelier.dart';
 
 final selectedStatusProvider = StateProvider<OrderStatus?>((ref) => null);
 final orderSearchQueryProvider = StateProvider<String>((ref) => '');
@@ -86,19 +88,18 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                     children: [
                       // Yarın teslim bölümü (arama yoksa ve teslim edildi filtresi seçili değilse göster)
                       if (tomorrowOrders.isNotEmpty && query.isEmpty && selectedStatus != OrderStatus.delivered) ...[
-                        _SectionLabel(
+                        SectionHeading(
                           label: 'Yarın Teslim',
                           icon: Icons.schedule,
-                          color: Colors.orange.shade700,
+                          color: Theme.of(context)
+                              .extension<AtelierColors>()!
+                              .amber,
                         ),
-                        const SizedBox(height: 8),
                         ...tomorrowOrders.map((o) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: _SwipeableOrderCard(order: o),
                             )),
-                        const SizedBox(height: 12),
-                        Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                       ],
                       ...filtered.map((o) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
@@ -114,29 +115,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Yeni Sipariş'),
       ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  const _SectionLabel({required this.label, required this.icon, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
-            )),
-      ],
     );
   }
 }
@@ -229,8 +207,8 @@ class _SwipeableOrderCard extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
         decoration: BoxDecoration(
-          color: Colors.green,
-          borderRadius: BorderRadius.circular(12),
+          color: Theme.of(context).extension<AtelierColors>()!.sage,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -257,112 +235,132 @@ class _OrderCardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dateFormat = DateFormat('d MMM yyyy', 'tr');
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
     final isDelivered = order.status == OrderStatus.delivered;
     final daysLeft = order.deliveryDate.difference(DateTime.now()).inDays;
     final isUrgent = !isDelivered && daysLeft <= 2;
 
+    final accent = isDelivered
+        ? atelier.graphite
+        : isUrgent
+            ? atelier.amber
+            : atelier.brass;
+
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: isDelivered
             ? null
             : () => context.push('/orders/${order.id}/edit', extra: order),
-        onLongPress: isDelivered
-            ? () => _confirmDelete(context, ref)
-            : null,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        onLongPress: isDelivered ? () => _confirmDelete(context, ref) : null,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      order.productName,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                          color: isDelivered
-                              ? Theme.of(context).colorScheme.outline
-                              : null),
-                    ),
-                  ),
-                  _StatusBadge(status: order.status),
-                ],
+              Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: SeamAccent(color: accent),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.person_outline, size: 14),
-                  const SizedBox(width: 4),
-                  Text(order.customerName,
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.outline)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today_outlined,
-                      size: 14,
-                      color: isUrgent ? Colors.red : null),
-                  const SizedBox(width: 4),
-                  Text(
-                    dateFormat.format(order.deliveryDate),
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: isUrgent
-                            ? Colors.red
-                            : Theme.of(context).colorScheme.outline,
-                        fontWeight:
-                            isUrgent ? FontWeight.w600 : FontWeight.normal),
-                  ),
-                  if (isUrgent) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      daysLeft == 0
-                          ? '(Bugün!)'
-                          : daysLeft < 0
-                              ? '(${-daysLeft} gün geçti!)'
-                              : '($daysLeft gün kaldı)',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                  const Spacer(),
-                  Text(
-                    '₺${order.price.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 15),
-                  ),
-                ],
-              ),
-              if (!isDelivered) ...[
-                const SizedBox(height: 6),
-                _FittingRow(customerId: order.customerId),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.swipe_left_outlined,
-                          size: 14,
-                          color: Theme.of(context).colorScheme.outline),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Teslim için sola kaydır',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(context).colorScheme.outline),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              order.productName,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: isDelivered ? atelier.graphite : null),
+                            ),
+                          ),
+                          _StatusBadge(status: order.status),
+                        ],
                       ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(Icons.person_outline,
+                              size: 14, color: atelier.graphite),
+                          const SizedBox(width: 4),
+                          Text(order.customerName,
+                              style: TextStyle(
+                                  fontSize: 13, color: atelier.graphite)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              size: 14,
+                              color: isUrgent ? atelier.amber : atelier.graphite),
+                          const SizedBox(width: 4),
+                          Text(
+                            dateFormat.format(order.deliveryDate),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color:
+                                    isUrgent ? atelier.amber : atelier.graphite,
+                                fontWeight: isUrgent
+                                    ? FontWeight.w700
+                                    : FontWeight.normal),
+                          ),
+                          if (isUrgent) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              daysLeft == 0
+                                  ? '· Bugün!'
+                                  : daysLeft < 0
+                                      ? '· ${-daysLeft} gün geçti'
+                                      : '· $daysLeft gün kaldı',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: atelier.amber,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                          const Spacer(),
+                          Text(
+                            '₺${order.price.toStringAsFixed(0)}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  fontSize: 19,
+                                  color: isDelivered ? atelier.graphite : null,
+                                ),
+                          ),
+                        ],
+                      ),
+                      if (!isDelivered) ...[
+                        const SizedBox(height: 8),
+                        _FittingRow(customerId: order.customerId),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Icon(Icons.swipe_left_outlined,
+                                  size: 14, color: atelier.graphite),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Teslim için sola kaydır',
+                                style: TextStyle(
+                                    fontSize: 11, color: atelier.graphite),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -402,19 +400,21 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = status == OrderStatus.delivered
-        ? Colors.grey
-        : Theme.of(context).colorScheme.primary;
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
+    final color = status == OrderStatus.delivered ? atelier.sage : atelier.brass;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
+        color: color.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(7),
       ),
       child: Text(
         status.label,
         style: TextStyle(
-            fontSize: 11, color: color, fontWeight: FontWeight.w500),
+            fontSize: 11,
+            color: color,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2),
       ),
     );
   }
@@ -444,16 +444,17 @@ class _FittingRow extends ConsumerWidget {
       label = 'Provaya $daysLeft gün kaldı';
     }
 
+    final plum = Theme.of(context).extension<AtelierColors>()!.plum;
     return Row(
       children: [
-        Icon(Icons.content_cut, size: 13, color: Colors.purple.shade400),
+        Icon(Icons.content_cut, size: 13, color: plum),
         const SizedBox(width: 4),
         Text(
           label,
           style: TextStyle(
             fontSize: 11,
-            color: daysLeft <= 1 ? Colors.purple.shade700 : Colors.purple.shade400,
-            fontWeight: daysLeft <= 1 ? FontWeight.w600 : FontWeight.normal,
+            color: plum,
+            fontWeight: daysLeft <= 1 ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ],

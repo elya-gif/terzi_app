@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import '../db/database_helper.dart';
 import '../models/fitting.dart';
+import '../services/firestore_sync_service.dart';
 import '../services/notification_service.dart';
 
 final allFittingsProvider =
@@ -15,7 +15,7 @@ class AllFittingsNotifier extends StateNotifier<List<Fitting>> {
   }
 
   Future<void> _load() async {
-    final fittings = await DatabaseHelper.instance.getAllFittings();
+    final fittings = await FirestoreSyncService.instance.getAllFittings();
     state = fittings;
   }
 
@@ -50,32 +50,34 @@ class FittingNotifier extends StateNotifier<List<Fitting>> {
   }
 
   Future<void> _load() async {
-    final fittings = await DatabaseHelper.instance.getFittings(customerId);
+    final fittings =
+        await FirestoreSyncService.instance.getFittings(customerId);
     state = fittings;
   }
 
   Future<void> addFitting(Fitting fitting) async {
-    final id = await DatabaseHelper.instance.insertFitting(fitting);
+    final id = await FirestoreSyncService.instance.nextId('fittings');
     final newFitting = fitting.copyWith(id: id);
     state = [...state, newFitting]
       ..sort((a, b) => a.fittingDate.compareTo(b.fittingDate));
     await NotificationService.instance.scheduleFittingReminder(newFitting);
+    await FirestoreSyncService.instance.upsertFitting(newFitting);
     _ref.read(allFittingsProvider.notifier).reload();
   }
 
   Future<void> updateFitting(Fitting fitting) async {
-    await DatabaseHelper.instance.updateFitting(fitting);
     await NotificationService.instance.cancelFittingReminder(fitting.id!);
     await NotificationService.instance.scheduleFittingReminder(fitting);
     state = state.map((f) => f.id == fitting.id ? fitting : f).toList()
       ..sort((a, b) => a.fittingDate.compareTo(b.fittingDate));
+    await FirestoreSyncService.instance.upsertFitting(fitting);
     _ref.read(allFittingsProvider.notifier).reload();
   }
 
   Future<void> deleteFitting(int id) async {
-    await DatabaseHelper.instance.deleteFitting(id);
     await NotificationService.instance.cancelFittingReminder(id);
     state = state.where((f) => f.id != id).toList();
+    await FirestoreSyncService.instance.deleteFitting(id);
     _ref.read(allFittingsProvider.notifier).reload();
   }
 }

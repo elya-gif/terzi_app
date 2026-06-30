@@ -9,6 +9,7 @@ import '../../models/order.dart';
 import '../../providers/fitting_provider.dart';
 import '../../providers/measurement_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../theme/app_theme.dart';
 
 class CustomerDetailScreen extends ConsumerStatefulWidget {
   final Customer customer;
@@ -51,6 +52,16 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: false,
+          labelColor: Theme.of(context).extension<AtelierColors>()!.brass,
+          unselectedLabelColor:
+              Theme.of(context).extension<AtelierColors>()!.graphite,
+          indicatorColor: Theme.of(context).extension<AtelierColors>()!.brass,
+          indicatorWeight: 2.5,
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
           tabs: const [
             Tab(text: 'Ölçüler'),
             Tab(text: 'Siparişler'),
@@ -837,11 +848,12 @@ class _StatusBadge extends StatelessWidget {
   }
 
   Color _color(BuildContext context) {
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
     switch (status) {
       case OrderStatus.delivered:
-        return Colors.grey;
+        return atelier.sage;
       default:
-        return Theme.of(context).colorScheme.primary;
+        return atelier.brass;
     }
   }
 }

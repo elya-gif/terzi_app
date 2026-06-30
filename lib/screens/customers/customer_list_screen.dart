@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../providers/customer_provider.dart';
 import '../../models/customer.dart';
 import '../../widgets/alpha_scroll_list.dart';
+import '../../widgets/atelier.dart';
+import '../../theme/app_theme.dart';
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -67,8 +69,10 @@ class _CustomerList extends ConsumerWidget {
     final filtered = ref.watch(filteredCustomersProvider);
 
     if (filtered.isEmpty) {
-      return const Center(
-        child: Text('Sonuç bulunamadı', style: TextStyle(color: Colors.grey)),
+      return Center(
+        child: Text('Sonuç bulunamadı',
+            style: TextStyle(
+                color: Theme.of(context).extension<AtelierColors>()!.graphite)),
       );
     }
 
@@ -87,53 +91,63 @@ class _CustomerCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(orderCountProvider(customer.id!));
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
 
     return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Text(
-            _initials(customer.name),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-            ),
-          ),
-        ),
-        title: Text(
-          customer.name,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(customer.phone),
-        trailing: orders > 0
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () =>
+            context.push('/customers/${customer.id}', extra: customer),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
+          child: Row(
+            children: [
+              MonogramAvatar(name: customer.name),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      customer.phone,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: atelier.graphite,
+                      ),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  '$orders sipariş',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+              if (orders > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: atelier.brassSoft,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$orders sipariş',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: atelier.brass,
+                    ),
                   ),
                 ),
-              )
-            : null,
-        onTap: () => context.push('/customers/${customer.id}', extra: customer),
+            ],
+          ),
+        ),
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return parts[0][0].toUpperCase();
   }
 }
 

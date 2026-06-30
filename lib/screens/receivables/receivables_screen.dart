@@ -6,6 +6,8 @@ import '../../models/payment_record.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../widgets/alpha_scroll_list.dart';
+import '../../widgets/atelier.dart';
+import '../../theme/app_theme.dart';
 
 // Müşteri başına borç özeti
 class CustomerDebt {
@@ -111,33 +113,52 @@ class _TotalBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: Theme.of(context).colorScheme.errorContainer,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
-        children: [
-          Icon(Icons.account_balance_wallet_outlined,
-              color: Theme.of(context).colorScheme.onErrorContainer),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Toplam Alacak',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onErrorContainer)),
-              Text(
-                '₺${total.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SeamAccent(color: scheme.error, height: 44),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'TOPLAM ALACAK',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.4,
+                      color: Theme.of(context)
+                          .extension<AtelierColors>()!
+                          .graphite,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '₺${total.toStringAsFixed(0)}',
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          color: scheme.error,
+                          fontSize: 34,
+                        ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+            Icon(Icons.account_balance_wallet_outlined,
+                size: 28, color: scheme.error.withValues(alpha: 0.55)),
+          ],
+        ),
       ),
     );
   }
@@ -149,46 +170,53 @@ class CustomerDebtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final atelier = Theme.of(context).extension<AtelierColors>()!;
     return Card(
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          child: Text(
-            _initials(debt.customerName),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-        ),
-        title: Text(debt.customerName,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('${debt.orders.length} borçlu sipariş'),
-        trailing: Text(
-          '₺${debt.totalDebt.toStringAsFixed(0)}',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => CustomerReceivablesScreen(debt: debt),
           ),
         ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
+          child: Row(
+            children: [
+              MonogramAvatar(
+                name: debt.customerName,
+                color: scheme.error,
+                background: scheme.errorContainer,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(debt.customerName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                    const SizedBox(height: 2),
+                    Text('${debt.orders.length} borçlu sipariş',
+                        style:
+                            TextStyle(fontSize: 13, color: atelier.graphite)),
+                  ],
+                ),
+              ),
+              Text(
+                '₺${debt.totalDebt.toStringAsFixed(0)}',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontSize: 20,
+                      color: scheme.error,
+                    ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return parts[0][0].toUpperCase();
   }
 }
 
@@ -303,11 +331,10 @@ class _OrderDebtCard extends ConsumerWidget {
                   children: [
                     Text(
                       '₺${order.remainingDebt.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontSize: 22,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                     ),
                     Text('kalan',
                         style: TextStyle(
@@ -416,7 +443,8 @@ class _PaymentRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(Icons.check_circle_outline,
-              size: 14, color: Colors.green.shade600),
+              size: 14,
+              color: Theme.of(context).extension<AtelierColors>()!.sage),
           const SizedBox(width: 6),
           Text(
             dateFormat.format(payment.paidAt),
